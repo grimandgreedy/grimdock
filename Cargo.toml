@@ -1,0 +1,17 @@
+[package]
+name = "grimdock"
+version = "0.1.0"
+edition = "2021"
+description = "Dockable panel layout system for egui"
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+egui = { version = "0.33.3", default-features = false }
+serde = { version = "1", features = ["derive"], optional = true }
+
+[features]
+default = []
+serde = ["dep:serde", "egui/serde"]
+
+[dev-dependencies]
+eframe = { version = "0.33.3", default-features = false, features = ["default_fonts", "glow"] }
