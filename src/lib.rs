@@ -18,6 +18,7 @@
 //! ```
 
 mod content;
+mod dnd;
 mod header;
 mod ids;
 mod layout;
@@ -162,7 +163,7 @@ impl<'ui, T: Clone + 'static> PanelContext<'ui, T> {
         self
     }
 
-    /// Run the layout, header, and content passes for the current frame.
+    /// Run the layout, header, content, and drag/drop passes for the current frame.
     pub fn show(self, render: impl FnMut(&mut Ui, &T)) -> PanelOutput<T>
     where
         T: PartialEq,
@@ -192,6 +193,7 @@ impl<'ui, T: Clone + 'static> PanelContext<'ui, T> {
             &mut output.pane_actions,
         );
         content::content_pass(ui, tree, &leaf_rects, style, render);
+        dnd::dnd_pass(ui, tree, style);
         output
     }
 }
