@@ -22,10 +22,15 @@ mod dnd;
 mod header;
 mod ids;
 mod layout;
+mod persistence;
 mod style;
 mod tab;
 mod tree;
 
+pub use persistence::{
+    LegacyPersistedNode, LegacyPersistedPanelTree, PersistError, PersistedNode, PersistedPanelTree,
+    PersistedPanelTreeFile, PANEL_TREE_FORMAT_VERSION,
+};
 pub use style::{
     ContentStyle, HandleStyle, HeaderButtonStyle, HeaderStyle, OverlayStyle, PaneStyleOverride,
     PanelStyle, TabStateStyle, TabStyle, TabStyleOverride, TypographyStyle,
