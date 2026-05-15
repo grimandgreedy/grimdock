@@ -1,0 +1,71 @@
+name: Publish Crate
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check tag matches Cargo.toml version
+        run: |
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          CARGO_VERSION=$(grep '^version = ' Cargo.toml | head -1 | sed 's/version = "\(.*\)"/\1/')
+          test "$TAG_VERSION" = "$CARGO_VERSION"
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install system dependencies
+        run: sudo apt-get update -q && sudo apt-get install -y libfontconfig1-dev
+
+      - name: Run tests
+        run: cargo test --lib
+
+      - name: Run serde tests
+        run: cargo test --lib --features serde
+
+      - name: Check examples
+        run: cargo check --examples
+
+      - name: Dry run publish
+        run: cargo publish --dry-run
+
+      - name: Publish to crates.io
+        run: cargo publish
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+
+      - name: Check for changelog
+        id: changelog_file
+        run: |
+          if [ -f CHANGELOG.md ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Get changelog entry
+        id: changelog
+        if: steps.changelog_file.outputs.present == 'true'
+        run: |
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          echo "body<<EOF" >> "$GITHUB_OUTPUT"
+          awk "/^## \[${TAG_VERSION}\]/{found=1; next} found && /^## /{exit} found{print}" CHANGELOG.md >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          body: ${{ steps.changelog.outputs.body }}
