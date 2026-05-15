@@ -3,7 +3,7 @@
 //! A dockable panel layout system for [egui](https://github.com/emilk/egui).
 //!
 //! Provides an IDE-style workspace where panels can be split, resized, and
-//! rearranged by dragging tabs, all within egui's immediate-mode layer.
+//! rearranged by dragging tabs — all within egui's immediate-mode layer.
 //!
 //! ## Quick start
 //!
@@ -47,8 +47,12 @@ use egui::Ui;
 /// identifier may already exist.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum OpenBehavior {
+    /// Always insert a fresh tab, even if the same identifier already exists.
     AllowDuplicate,
+    /// Focus the existing tab anywhere in the dock instead of creating another.
     FocusExisting,
+    /// Focus the existing tab only if it is already in the target pane.
+    /// Otherwise insert a duplicate into the target pane.
     FocusExistingInPane,
 }
 
@@ -101,7 +105,9 @@ pub struct PaneActionInvocation {
 /// Mutations emitted by a single [`PanelContext::show`] pass.
 #[derive(Debug)]
 pub struct PanelOutput<T> {
+    /// Tabs closed from pane headers during this frame.
     pub closed_tabs: Vec<T>,
+    /// Custom pane actions invoked from built-in pane menus during this frame.
     pub pane_actions: Vec<PaneActionInvocation>,
 }
 
@@ -115,6 +121,21 @@ impl<T> Default for PanelOutput<T> {
 }
 
 /// Entry point for rendering the panel layout each frame.
+///
+/// The caller owns and persists the [`PanelTree`] across frames. Each frame,
+/// construct a `PanelContext` and call [`PanelContext::show`] with a render
+/// callback.
+///
+/// # Example
+///
+/// ```rust,no_run
+/// # use grimdock::{PanelTree, PanelStyle, PanelContext, Tab};
+/// # fn show(ui: &mut egui::Ui, tree: &mut PanelTree<&'static str>) {
+/// PanelContext::new(ui, tree, &PanelStyle::default()).show(|ui, id| {
+///     ui.heading(*id);
+/// });
+/// # }
+/// ```
 pub struct PanelContext<'ui, T: Clone + 'static> {
     ui: &'ui mut Ui,
     tree: &'ui mut PanelTree<T>,
@@ -142,11 +163,14 @@ impl<'ui, T: Clone + 'static> PanelContext<'ui, T> {
         }
     }
 
+    /// Provide the same entries for built-in add-tab, overflow, and split-here
+    /// menus in every pane.
     pub fn with_add_tab_entries(mut self, add_tab_entries: &'ui [AddTabEntry<T>]) -> Self {
         self.add_tab_entries = add_tab_entries;
         self
     }
 
+    /// Provide pane-scoped entries for built-in add-tab and split-here menus.
     pub fn with_add_tab_provider(
         mut self,
         add_tab_provider: &'ui dyn Fn(PaneId, &PanelTree<T>) -> Vec<AddTabEntry<T>>,
@@ -155,11 +179,13 @@ impl<'ui, T: Clone + 'static> PanelContext<'ui, T> {
         self
     }
 
+    /// Provide the same custom pane menu actions for every pane.
     pub fn with_pane_menu_actions(mut self, pane_menu_actions: &'ui [PaneMenuAction]) -> Self {
         self.pane_menu_actions = pane_menu_actions;
         self
     }
 
+    /// Provide pane-scoped custom actions for the built-in pane menu.
     pub fn with_pane_menu_provider(
         mut self,
         pane_menu_provider: &'ui dyn Fn(PaneId, &PanelTree<T>) -> Vec<PaneMenuAction>,
@@ -168,7 +194,11 @@ impl<'ui, T: Clone + 'static> PanelContext<'ui, T> {
         self
     }
 
-    /// Run the layout, header, content, and drag/drop passes for the current frame.
+    /// Run all three rendering passes and resolve any drag-and-drop that
+    /// completed this frame.
+    ///
+    /// `render` is called once per visible leaf with the egui [`Ui`] for that
+    /// pane's content area and a reference to the focused tab's identifier.
     pub fn show(self, render: impl FnMut(&mut Ui, &T)) -> PanelOutput<T>
     where
         T: PartialEq,
@@ -184,7 +214,10 @@ impl<'ui, T: Clone + 'static> PanelContext<'ui, T> {
         } = self;
         let mut output = PanelOutput::default();
 
+        // Pass 1: layout — assign rects, draw resize handles.
         let leaf_rects = layout::layout_pass(ui, tree, style);
+
+        // Pass 2: headers — draw tab buttons, initiate drags.
         header::header_pass(
             ui,
             tree,
@@ -197,8 +230,13 @@ impl<'ui, T: Clone + 'static> PanelContext<'ui, T> {
             &mut output.closed_tabs,
             &mut output.pane_actions,
         );
+
+        // Pass 3: content — invoke caller callback for each focused tab.
         content::content_pass(ui, tree, &leaf_rects, style, render);
+
+        // Pass 4: drag-and-drop — draw overlay, resolve drops.
         dnd::dnd_pass(ui, tree, style);
+
         output
     }
 }
