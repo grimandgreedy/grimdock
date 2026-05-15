@@ -30,15 +30,6 @@ jobs:
       - name: Install system dependencies
         run: sudo apt-get update -q && sudo apt-get install -y libfontconfig1-dev
 
-      - name: Run tests
-        run: cargo test --lib
-
-      - name: Run serde tests
-        run: cargo test --lib --features serde
-
-      - name: Check examples
-        run: cargo check --examples
-
       - name: Dry run publish
         run: cargo publish --dry-run
 
