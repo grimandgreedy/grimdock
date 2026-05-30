@@ -227,8 +227,18 @@ fn render_tabs<T: Clone + 'static>(
 
     let min_tab_width = 72.0;
     let overflow_button_width = action_button_width + action_button_padding * 2.0;
-    let (visible_indices, hidden_indices, tab_width) =
-        compute_visible_tabs(tab_count, focused, tabs_rect.width(), min_tab_width, overflow_button_width);
+    let padding_x = 8.0;
+    let leading_gap = 6.0;
+    let close_button_width = 16.0;
+    let close_button_padding = 4.0;
+    let tab_max_widths = tab_max_widths(tree, leaf_idx);
+    let (visible_indices, hidden_indices) = compute_visible_tabs(
+        tab_count,
+        focused,
+        tabs_rect.width(),
+        min_tab_width,
+        overflow_button_width,
+    );
 
     let overflow_rect = if hidden_indices.is_empty() {
         None
@@ -241,12 +251,14 @@ fn render_tabs<T: Clone + 'static>(
         Some(rect)
     };
 
+    let visible_width =
+        (tabs_rect.width() - if hidden_indices.is_empty() { 0.0 } else { overflow_button_width })
+            .max(0.0);
+    let tab_widths = compute_tab_widths(&visible_indices, visible_width, &tab_max_widths, min_tab_width);
+
     let mut pending_action: Option<PendingAction<T>> = None;
     let mut new_focused = focused;
-    let padding_x = 8.0;
-    let leading_gap = 6.0;
-    let close_button_width = 16.0;
-    let close_button_padding = 4.0;
+    let mut current_x = tabs_rect.min.x;
 
     for (slot, &tab_index) in visible_indices.iter().enumerate() {
         let Some((title, icon, draggable, closable, tab_style_override)) = (match tree.node(leaf_idx) {
@@ -267,9 +279,10 @@ fn render_tabs<T: Clone + 'static>(
         };
 
         let tab_rect = Rect::from_min_size(
-            egui::pos2(tabs_rect.min.x + slot as f32 * tab_width, tabs_rect.min.y),
-            vec2(tab_width, style.header_height),
+            egui::pos2(current_x, tabs_rect.min.y),
+            vec2(tab_widths.get(slot).copied().unwrap_or(min_tab_width), style.header_height),
         );
+        current_x = tab_rect.max.x;
         let painted_tab_rect = paint_tab_rect(tab_rect, slot, visible_indices.len());
         let is_focused = tab_index == focused;
         let hovered = ui.rect_contains_pointer(tab_rect);
@@ -668,9 +681,9 @@ fn compute_visible_tabs(
     available_width: f32,
     min_tab_width: f32,
     overflow_width: f32,
-) -> (Vec<usize>, Vec<usize>, f32) {
+) -> (Vec<usize>, Vec<usize>) {
     if tab_count == 0 {
-        return (Vec::new(), Vec::new(), min_tab_width);
+        return (Vec::new(), Vec::new());
     }
 
     let mut needs_overflow = false;
@@ -699,10 +712,75 @@ fn compute_visible_tabs(
     }
 
     let hidden: Vec<usize> = (0..tab_count).filter(|idx| !visible.contains(idx)).collect();
-    let visible_width =
-        (available_width - if hidden.is_empty() { 0.0 } else { overflow_width }).max(0.0);
-    let tab_width = (visible_width / visible.len().max(1) as f32).min(120.0).max(40.0);
-    (visible, hidden, tab_width)
+    (visible, hidden)
+}
+
+fn compute_tab_widths(
+    visible_indices: &[usize],
+    visible_width: f32,
+    tab_max_widths: &[Option<f32>],
+    min_tab_width: f32,
+) -> Vec<f32> {
+    if visible_indices.is_empty() {
+        return Vec::new();
+    }
+
+    let mut widths = vec![visible_width / visible_indices.len() as f32; visible_indices.len()];
+    let mut flexible = vec![true; visible_indices.len()];
+
+    loop {
+        let mut changed = false;
+        let mut leftover = 0.0;
+        let mut flexible_count = 0usize;
+
+        for (slot, width) in widths.iter_mut().enumerate() {
+            if !flexible[slot] {
+                continue;
+            }
+            let max_width = tab_max_widths
+                .get(visible_indices[slot])
+                .copied()
+                .flatten()
+                .unwrap_or(f32::INFINITY);
+            if *width > max_width {
+                leftover += *width - max_width;
+                *width = max_width;
+                flexible[slot] = false;
+                changed = true;
+            } else {
+                flexible_count += 1;
+            }
+        }
+
+        if !changed || leftover <= 0.0 || flexible_count == 0 {
+            break;
+        }
+
+        let extra = leftover / flexible_count as f32;
+        for (slot, width) in widths.iter_mut().enumerate() {
+            if flexible[slot] {
+                *width += extra;
+            }
+        }
+    }
+
+    for width in &mut widths {
+        *width = width.max(min_tab_width);
+    }
+    widths
+}
+
+fn tab_max_widths<T: Clone + 'static>(
+    tree: &crate::PanelTree<T>,
+    leaf_idx: usize,
+) -> Vec<Option<f32>> {
+    match tree.node(leaf_idx) {
+        Node::Leaf { tabs, .. } => tabs
+            .iter()
+            .map(|tab| tab.style_override.and_then(|style| style.max_width))
+            .collect(),
+        _ => Vec::new(),
+    }
 }
 
 fn header_menu_button(

@@ -354,6 +354,7 @@ mod tests {
                     text_color: None,
                     accent_color: None,
                     icon_color: None,
+                    max_width: Some(120.0),
                 }),
             )
             .push_tab(Tab::new("B", "b"))

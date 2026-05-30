@@ -77,7 +77,7 @@ impl PaneStyleOverride {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct TabStyleOverride {
     pub active_bg: Option<Color32>,
@@ -87,6 +87,9 @@ pub struct TabStyleOverride {
     pub accent_color: Option<Color32>,
     /// Override colour applied only to the leading icon, not the title text.
     pub icon_color: Option<Color32>,
+    /// Maximum header width for this tab when there is spare room.
+    /// `None` means the tab may stretch to fill the available width.
+    pub max_width: Option<f32>,
 }
 
 impl TabStyleOverride {
@@ -98,6 +101,7 @@ impl TabStyleOverride {
             text_color: None,
             accent_color: None,
             icon_color: None,
+            max_width: None,
         }
     }
 }
@@ -331,6 +335,7 @@ mod tests {
         let tab = TabStyleOverride {
             active_bg: Some(Color32::from_rgb(4, 5, 6)),
             text_color: Some(Color32::from_rgb(7, 8, 9)),
+            max_width: Some(120.0),
             ..TabStyleOverride::none()
         };
 
