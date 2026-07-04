@@ -57,13 +57,21 @@ pub struct TypographyStyle {
     pub tab_icon_text_font: FontId,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+// `Eq` is intentionally not derived: `content_inset` holds an `Option<f32>`, and
+// `f32` is not `Eq`. `PartialEq` still covers equality comparisons callers need.
+#[derive(Clone, Copy, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct PaneStyleOverride {
     pub header_bg: Option<Color32>,
     pub content_bg: Option<Color32>,
     pub border_color: Option<Color32>,
     pub accent_color: Option<Color32>,
+    /// Overrides [`PanelStyle::content_inset`] for this pane. `None` uses the
+    /// global inset. Set to `Some(0.0)` for an edge-to-edge pane (a 3D viewport
+    /// whose render and gizmo overlay should fill the content area) while other
+    /// panes keep the global padding.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub content_inset: Option<f32>,
 }
 
 impl PaneStyleOverride {
@@ -73,6 +81,7 @@ impl PaneStyleOverride {
             content_bg: None,
             border_color: None,
             accent_color: None,
+            content_inset: None,
         }
     }
 }
@@ -216,6 +225,11 @@ impl PanelStyle {
         pane.and_then(|pane| pane.content_bg).unwrap_or(self.content.bg)
     }
 
+    pub fn pane_content_inset(&self, pane: Option<PaneStyleOverride>) -> f32 {
+        pane.and_then(|pane| pane.content_inset)
+            .unwrap_or(self.content_inset)
+    }
+
     pub fn pane_border_color(&self, pane: Option<PaneStyleOverride>) -> Color32 {
         pane.and_then(|pane| pane.border_color)
             .unwrap_or(self.content.border_color)
@@ -343,6 +357,28 @@ mod tests {
         assert_eq!(state.bg, Color32::from_rgb(4, 5, 6));
         assert_eq!(state.text_color, Color32::from_rgb(7, 8, 9));
         assert_eq!(state.accent_color, Color32::from_rgb(1, 2, 3));
+    }
+
+    #[test]
+    fn pane_content_inset_prefers_override_then_global() {
+        let style = PanelStyle {
+            content_inset: 8.0,
+            ..PanelStyle::default()
+        };
+
+        // No override falls back to the global inset.
+        assert_eq!(style.pane_content_inset(None), 8.0);
+        assert_eq!(
+            style.pane_content_inset(Some(PaneStyleOverride::none())),
+            8.0
+        );
+
+        // An explicit per-pane inset wins, including an edge-to-edge zero.
+        let edge_to_edge = PaneStyleOverride {
+            content_inset: Some(0.0),
+            ..PaneStyleOverride::none()
+        };
+        assert_eq!(style.pane_content_inset(Some(edge_to_edge)), 0.0);
     }
 
     #[test]

@@ -54,6 +54,7 @@ impl App {
                 content_bg: Some(egui::Color32::from_rgb(34, 22, 16)),
                 border_color: Some(egui::Color32::from_rgb(168, 99, 56)),
                 accent_color: Some(egui::Color32::from_rgb(230, 142, 78)),
+                content_inset: None,
             },
             search_override_enabled: true,
             search_override: TabStyleOverride {
@@ -63,6 +64,7 @@ impl App {
                 text_color: Some(egui::Color32::from_rgb(214, 245, 238)),
                 accent_color: Some(egui::Color32::from_rgb(52, 204, 168)),
                 icon_color: None,
+                max_width: None,
             },
         }
     }

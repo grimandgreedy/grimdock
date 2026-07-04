@@ -223,7 +223,9 @@ pub enum PaneRole {
 }
 
 /// Behaviour flags for a pane leaf.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+// Not `Eq`: `style_override` carries an `Option<f32>` inset, and `f32` is not
+// `Eq`. `PartialEq` is retained.
+#[derive(Clone, Copy, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct PaneOptions {
     /// Header/tab bar visibility policy.

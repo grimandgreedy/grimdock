@@ -71,6 +71,7 @@ impl App {
                     text_color: Some(egui::Color32::from_rgb(221, 231, 200)),
                     accent_color: Some(egui::Color32::from_rgb(164, 196, 92)),
                     icon_color: None,
+                    max_width: None,
                 }),
             Tab::new("editor_2", TabId::Editor(2)).with_leading_visual("+"),
         ]);
@@ -86,6 +87,7 @@ impl App {
                         content_bg: Some(egui::Color32::from_rgb(21, 36, 34)),
                         border_color: Some(egui::Color32::from_rgb(52, 90, 84)),
                         accent_color: Some(egui::Color32::from_rgb(85, 188, 162)),
+                        content_inset: None,
                     }),
                     drop_policy: DropPolicy::merge_only(),
                     ..Default::default()

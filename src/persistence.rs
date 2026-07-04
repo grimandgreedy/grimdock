@@ -343,6 +343,7 @@ mod tests {
             content_bg: None,
             border_color: None,
             accent_color: None,
+            content_inset: None,
         });
 
         let mut tree = PanelTree::from_pane(
